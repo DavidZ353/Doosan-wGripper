@@ -1,0 +1,15 @@
+<?xml version="1.0" ?>
+<robot name="test_bot">
+  <link name="table">
+    <visual>
+      <geometry>
+        <box size="1.0 1.0 1.05"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="1.0 1.0 1.05"/>
+      </geometry>
+    </collision>
+  </link>
+</robot>
