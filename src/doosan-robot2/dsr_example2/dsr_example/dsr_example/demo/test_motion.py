@@ -81,7 +81,7 @@ def main(args=None):
     #node.call_move_spiral()
 
     #node.get_logger().info('Motion sequence complete.')
-    #node.destroy_node()
+    node.destroy_node()
     rclpy.shutdown()
 
 if __name__ == '__main__':
