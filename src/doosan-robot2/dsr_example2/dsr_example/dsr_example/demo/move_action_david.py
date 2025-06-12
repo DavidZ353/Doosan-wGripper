@@ -1,170 +1,144 @@
-import rclpy
-from rclpy.action import ActionClient
-from rclpy.node import Node
+#!/usr/bin/env python3
+"""
+Shows how to use a planning scene in MoveItPy to add collision objects and perform collision checking.
+"""
 
-from shape_msgs.msg import SolidPrimitive
-from moveit_msgs.action import MoveGroup
-from moveit_msgs.msg import MotionPlanRequest, Constraints, PositionConstraint, OrientationConstraint, WorkspaceParameters
-from moveit_msgs.msg import RobotState
-from geometry_msgs.msg import PoseStamped
-from builtin_interfaces.msg import Duration
+import time
+import rclpy
+from rclpy.logging import get_logger
 
 from moveit.planning import MoveItPy
 
-class MoveGroupClient(Node):
-    def __init__(self):
-        super().__init__('move_group_action_client')
-        self._client = ActionClient(self, MoveGroup, '/move_action')
+from geometry_msgs.msg import Pose
+from moveit_msgs.msg import CollisionObject
+from shape_msgs.msg import SolidPrimitive
 
-    def send_named_target(self, group_name: str, target_name: str):
-        self.get_logger().info(f'Sending goal to MoveIt: group={group_name}, target={target_name}')
-        goal_msg = MoveGroup.Goal()
-        goal_msg.request.group_name = group_name
-        goal_msg.request.num_planning_attempts = 5
-        goal_msg.request.allowed_planning_time = 5.0
-        goal_msg.request.max_velocity_scaling_factor = 0.5
-        goal_msg.request.max_acceleration_scaling_factor = 0.5
 
-        # Named target as constraint
-        goal_msg.request.goal_constraints = [
-            Constraints(name=target_name)
-        ]
+def plan_and_execute(
+    robot,
+    planning_component,
+    logger,
+    sleep_time=0.0,
+):
+    """Helper function to plan and execute a motion."""
+    # plan to goal
+    logger.info("Planning trajectory")
+    plan_result = planning_component.plan()
 
-        self._client.wait_for_server()
+    # execute the plan
+    if plan_result:
+        logger.info("Executing plan")
+        robot_trajectory = plan_result.trajectory
+        robot.execute(robot_trajectory, controllers=[])
+    else:
+        logger.error("Planning failed")
 
-        future = self._client.send_goal_async(goal_msg)
-        rclpy.spin_until_future_complete(self, future)
+    time.sleep(sleep_time)
 
-        if not future.result().accepted:
-            self.get_logger().error('Goal was rejected')
-            return
 
-        goal_handle = future.result()
-        self.get_logger().info('Goal accepted, waiting for result...')
-        result_future = goal_handle.get_result_async()
-        rclpy.spin_until_future_complete(self, result_future)
+def add_collision_objects(planning_scene_monitor):
+    """Helper function that adds collision objects to the planning scene."""
+    object_positions = [
+        (0.15, 0.1, 0.5),
+        (0.25, 0.0, 1.0),
+        (-0.25, -0.3, 0.8),
+        (0.25, 0.3, 0.75),
+    ]
+    object_dimensions = [
+        (0.1, 0.4, 0.1),
+        (0.1, 0.4, 0.1),
+        (0.2, 0.2, 0.2),
+        (0.15, 0.15, 0.15),
+    ]
 
-        result = result_future.result().result
-        if result.error_code.val == result.error_code.SUCCESS:
-            self.get_logger().info('Motion succeeded!')
-        else:
-            self.get_logger().error(f'Motion failed with error code: {result.error_code.val}')
+    with planning_scene_monitor.read_write() as scene:
+        collision_object = CollisionObject()
+        collision_object.header.frame_id = "panda_link0"
+        collision_object.id = "boxes"
 
-    def send_cartesian_goal(self):
-        self.get_logger().info('Waiting for action server...')
-        self._client.wait_for_server()
+        for position, dimensions in zip(object_positions, object_dimensions):
+            box_pose = Pose()
+            box_pose.position.x = position[0]
+            box_pose.position.y = position[1]
+            box_pose.position.z = position[2]
 
-        goal_msg = MoveGroup.Goal()
-        goal_msg.request.group_name = 'manipulator'  # Change this to your actual group name
-        goal_msg.request.allowed_planning_time = 5.0
-        goal_msg.request.max_velocity_scaling_factor = 0.5
-        goal_msg.request.max_acceleration_scaling_factor = 0.5
+            box = SolidPrimitive()
+            box.type = SolidPrimitive.BOX
+            box.dimensions = dimensions
 
-        # === Create PoseStamped Target ===
-        pose = PoseStamped()
-        pose.header.frame_id = 'base_link'  # Replace with your robot’s base frame
-        pose.pose.position.x = 0.2
-        pose.pose.position.y = 0.1
-        pose.pose.position.z = 0.1
-        pose.pose.orientation.w = 1.0  # No rotation
+            collision_object.primitives.append(box)
+            collision_object.primitive_poses.append(box_pose)
+            collision_object.operation = CollisionObject.ADD
 
-        # === Position Constraint ===
-        position_constraint = PositionConstraint()
-        position_constraint.header = pose.header
-        position_constraint.link_name = 'gripper'  # Replace with your robot's end-effector link
-        position_constraint.target_point_offset.x = 0.0
-        position_constraint.target_point_offset.y = 0.0
-        position_constraint.target_point_offset.z = 0.0
-        position_constraint.weight = 1.0
-
-        # Region: Box with tiny volume around the target point
-        primitive = SolidPrimitive()
-        primitive.type = SolidPrimitive.BOX
-        primitive.dimensions = [0.05, 0.05, 0.05]  # Tight constraint
-
-        position_constraint.constraint_region.primitives.append(primitive)
-        position_constraint.constraint_region.primitive_poses.append(pose.pose)
-
-        # === Orientation Constraint ===
-        orientation_constraint = OrientationConstraint()
-        orientation_constraint.header = pose.header
-        orientation_constraint.link_name = 'gripper'  # Replace as needed
-        orientation_constraint.orientation = pose.pose.orientation
-        orientation_constraint.absolute_x_axis_tolerance = 0.1
-        orientation_constraint.absolute_y_axis_tolerance = 0.1
-        orientation_constraint.absolute_z_axis_tolerance = 0.1
-        orientation_constraint.weight = 1.0
-
-        # === Attach constraints to request ===
-        constraints = Constraints()
-        constraints.position_constraints.append(position_constraint)
-        constraints.orientation_constraints.append(orientation_constraint)
-
-        goal_msg.request.goal_constraints = [constraints]
-
-        self.get_logger().info('Sending Cartesian goal to MoveIt...')
-        send_goal_future = self._client.send_goal_async(goal_msg)
-        rclpy.spin_until_future_complete(self, send_goal_future)
-
-        goal_handle = send_goal_future.result()
-        if not goal_handle.accepted:
-            self.get_logger().error('Goal rejected')
-            return
-
-        self.get_logger().info('Goal accepted, waiting for result...')
-        result_future = goal_handle.get_result_async()
-        rclpy.spin_until_future_complete(self, result_future)
-        result = result_future.result()
-
-        if result.result.error_code.val == result.result.error_code.SUCCESS:
-            self.get_logger().info('Motion succeeded!')
-        else:
-            self.get_logger().error(f'Motion failed with error code: {result.result.error_code.val}')
-
-        def plan_and_execute(
-            robot,
-            planning_component,
-            logger,
-            single_plan_parameters=None,
-            multi_plan_parameters=None,
-            ):
-            """A helper function to plan and execute a motion."""
-            # plan to goal
-            logger.info("Planning trajectory")
-            if multi_plan_parameters is not None:
-                    plan_result = planning_component.plan(
-                            multi_plan_parameters=multi_plan_parameters
-                    )
-            elif single_plan_parameters is not None:
-                    plan_result = planning_component.plan(
-                            single_plan_parameters=single_plan_parameters
-                    )
-            else:
-                    plan_result = planning_component.plan()
-
-            # execute the plan
-            if plan_result:
-                    logger.info("Executing plan")
-                    robot_trajectory = plan_result.trajectory
-                    robot.execute(robot_trajectory, controllers=[])
-            else:
-                    logger.error("Planning failed")
-
+        scene.apply_collision_object(collision_object)
+        scene.current_state.update()  # Important to ensure the scene is updated
 
 
 def main():
+    ###################################################################
+    # MoveItPy Setup
+    ###################################################################
     rclpy.init()
-    logger = rclpy.logging.get_logger("moveit_py.pose_goal")
+    logger = get_logger("moveit_py_planning_scene")
+
     # instantiate MoveItPy instance and get planning component
-    panda = MoveItPy(node_name="moveit_py")
+    panda = MoveItPy(node_name="moveit_py_planning_scene")
     panda_arm = panda.get_planning_component("panda_arm")
+    planning_scene_monitor = panda.get_planning_scene_monitor()
     logger.info("MoveItPy instance created")
 
-    client = MoveGroupClient()
-    client.send_cartesian_goal()
-    #client.send_named_target(group_name='manipulator', target_name='ready')  # Update these names as needed
-    client.destroy_node()
-    rclpy.shutdown()
+    ###################################################################
+    # Plan with collision objects
+    ###################################################################
 
-if __name__ == '__main__':
+    add_collision_objects(planning_scene_monitor)
+    panda_arm.set_start_state(configuration_name="ready")
+    panda_arm.set_goal_state(configuration_name="extended")
+    plan_and_execute(panda, panda_arm, logger, sleep_time=3.0)
+
+    ###################################################################
+    # Check collisions
+    ###################################################################
+    with planning_scene_monitor.read_only() as scene:
+        robot_state = scene.current_state
+        original_joint_positions = robot_state.get_joint_group_positions("panda_arm")
+
+        # Set the pose goal
+        pose_goal = Pose()
+        pose_goal.position.x = 0.25
+        pose_goal.position.y = 0.25
+        pose_goal.position.z = 0.5
+        pose_goal.orientation.w = 1.0
+
+        # Set the robot state and check collisions
+        robot_state.set_from_ik("panda_arm", pose_goal, "panda_hand")
+        robot_state.update()  # required to update transforms
+        robot_collision_status = scene.is_state_colliding(
+            robot_state=robot_state, joint_model_group_name="panda_arm", verbose=True
+        )
+        logger.info(f"\nRobot is in collision: {robot_collision_status}\n")
+
+        # Restore the original state
+        robot_state.set_joint_group_positions(
+            "panda_arm",
+            original_joint_positions,
+        )
+        robot_state.update()  # required to update transforms
+
+    time.sleep(3.0)
+
+    ###################################################################
+    # Remove collision objects and return to the ready pose
+    ###################################################################
+
+    with planning_scene_monitor.read_write() as scene:
+        scene.remove_all_collision_objects()
+        scene.current_state.update()
+
+    panda_arm.set_start_state_to_current_state()
+    panda_arm.set_goal_state(configuration_name="ready")
+    plan_and_execute(panda, panda_arm, logger, sleep_time=3.0)
+
+
+if __name__ == "__main__":
     main()

@@ -44,6 +44,57 @@ class ApplicationDemo(Node):
             10
         )
 
+        # Create a publisher for the /joint_states topic
+        # This is the standard topic where robot joint states are published
+        self.joint_state_pub = self.create_publisher(JointState, '/schunk/driver/EGU_60_M_B_1/joint_states', 10)
+
+        # Set the publishing rate (e.g., 10 Hz)
+        self.timer = self.create_timer(0.1, self.publish_gripper_state) # 0.1 seconds = 10 Hz
+
+        self.get_logger().info("Gripper joint publisher started.")
+
+        # Define your gripper joint names
+        # IMPORTANT: Replace 'gripper_finger_joint' with the actual name(s) of your gripper joint(s)
+        # from your URDF. If you have multiple joints for the gripper, list them here.
+        self.gripper_joint_names = ['left_finger_joint', 'right_finger_joint'] # Example: ['left_finger_joint', 'right_finger_joint']
+
+        # Define target positions for opening and closing the gripper
+        # Adjust these values based on your gripper's joint limits
+        self.open_position = 0.0  # Fully open (or a value close to it)
+        self.closed_position = 0.06 # Fully closed (or a value close to it) - adjust based on your gripper's range
+
+        # Current target position for the gripper
+        self.current_target_position = self.open_position
+        self.last_toggle_time = self.get_clock().now().nanoseconds / 1e9 # Get current time in seconds
+
+    def publish_gripper_state(self):
+        # Create a JointState message
+        joint_state_msg = JointState()
+
+        # Set the header timestamp
+        joint_state_msg.header.stamp = self.get_clock().now().to_msg()
+
+        # Assign the joint names
+        joint_state_msg.name = self.gripper_joint_names
+
+        # Assign the joint positions
+        # For a single joint, this will be a list with one element
+        joint_state_msg.position = [self.current_target_position] * len(self.gripper_joint_names)
+        # If you have multiple joints that move differently, you'd set them individually:
+        # joint_state_msg.position = [left_finger_pos, right_finger_pos]
+
+        # Publish the message
+        self.joint_state_pub.publish(joint_state_msg)
+
+        # Toggle between open and closed positions every few seconds for demonstration
+        current_time = self.get_clock().now().nanoseconds / 1e9
+        if (current_time - self.last_toggle_time) > 2.0: # Toggle every 2 seconds
+            if self.current_target_position == self.open_position:
+                self.current_target_position = self.closed_position
+            else:
+                self.current_target_position = self.open_position
+            self.last_toggle_time = current_time
+
     def call_move_joint(self, pos, vel=20.0, acc=20.0):
         req = MoveJoint.Request()
         req.pos = pos

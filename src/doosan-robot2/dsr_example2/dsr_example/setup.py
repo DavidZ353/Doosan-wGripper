@@ -23,7 +23,8 @@ setup(
                 'dance = dsr_example.demo.dance_m1013:main',
                 'single_robot_simple = dsr_example.simple.single_robot_simple:main',
                 'test_motion = dsr_example.demo.test_motion:main',
-                'move_action = dsr_example.demo.move_action:main'
+                'move_action = dsr_example.demo.move_action:main',
+                'move_group = dsr_example.demo.move_action_david:main'
         ],
     },
 )

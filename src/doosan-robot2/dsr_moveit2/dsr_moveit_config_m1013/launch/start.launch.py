@@ -61,8 +61,17 @@ def rviz_node_function(context):
         get_package_share_directory(package_name_str), "launch"
     )
     rviz_full_config = os.path.join(rviz_base, "moveit.rviz")
+
+    # Add hello_moveit node with same MoveIt config
+    hello_node = Node(
+        package="hello_moveit",
+        executable="hello_moveit",
+        name="hello_moveit",
+        output="screen",
+        parameters=[moveit_config.to_dict()],
+    )
     
-    return [run_move_group_node, 
+    return [run_move_group_node, hello_node,
         Node(
         package="rviz2",
         executable="rviz2",
