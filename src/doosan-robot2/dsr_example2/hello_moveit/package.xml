@@ -12,7 +12,10 @@
   <depend>moveit_ros_planning_interface</depend>
   <depend>rclcpp</depend>
   <depend>moveit_visual_tools</depend>
-  <build_depend>geometric_shapes</build_depend>
+  <depend>geometric_shapes</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>schunk_gripper_interfaces</depend>
   <exec_depend>geometric_shapes</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
