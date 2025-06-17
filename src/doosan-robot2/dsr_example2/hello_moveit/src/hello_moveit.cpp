@@ -83,6 +83,37 @@ int main(int argc, char * argv[])
   moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
   planning_scene_interface.applyCollisionObject(collision_object);
 
+  // Add a collision object from a .dae mesh file
+  moveit_msgs::msg::CollisionObject mesh_object;
+  mesh_object.header.frame_id = move_group_interface.getPlanningFrame();
+  mesh_object.id = "mesh1";
+
+  // Load mesh from file
+  const std::string mesh_path = "package://dsr_description2/meshes/container_corner/Depot_Stacker.dae"; // Update path as needed
+  shapes::Mesh* m = shapes::createMeshFromResource(mesh_path);
+  if (!m) {
+    RCLCPP_ERROR(logger, "Failed to load mesh from %s", mesh_path.c_str());
+  } else {
+    shape_msgs::msg::Mesh mesh_msg;
+    shapes::ShapeMsg mesh_msg_tmp;
+    shapes::constructMsgFromShape(m, mesh_msg_tmp);
+    mesh_msg = boost::get<shape_msgs::msg::Mesh>(mesh_msg_tmp);
+
+    mesh_object.meshes.push_back(mesh_msg);
+
+    geometry_msgs::msg::Pose mesh_pose;
+    mesh_pose.orientation.w = 1.0;
+    mesh_pose.position.x = 0.5;
+    mesh_pose.position.y = 0.0;
+    mesh_pose.position.z = 0.5;
+    mesh_object.mesh_poses.push_back(mesh_pose);
+
+    mesh_object.operation = mesh_object.ADD;
+    planning_scene_interface.applyCollisionObject(mesh_object);
+
+    delete m;
+  }
+
   // Construct and initialize MoveItVisualTools
   auto moveit_visual_tools = moveit_visual_tools::MoveItVisualTools{
       node, "world", rviz_visual_tools::RVIZ_MARKER_TOPIC,
