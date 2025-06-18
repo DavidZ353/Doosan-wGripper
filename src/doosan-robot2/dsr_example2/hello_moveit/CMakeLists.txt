@@ -16,8 +16,9 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(schunk_gripper_interfaces REQUIRED)
+find_package(shape_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
-add_executable(hello_moveit src/schunk_demo.cpp)
 add_executable(hello_moveit src/hello_moveit.cpp)
 target_include_directories(hello_moveit PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -31,6 +32,8 @@ ament_target_dependencies(
   "moveit_ros_planning_interface"
   "moveit_visual_tools"
   "geometric_shapes"
+  "shape_msgs"
+  "geometry_msgs"
   "rclcpp"
 )
 

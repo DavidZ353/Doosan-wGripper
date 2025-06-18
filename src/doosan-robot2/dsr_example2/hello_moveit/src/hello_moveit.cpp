@@ -50,69 +50,108 @@ int main(int argc, char * argv[])
 
   RCLCPP_INFO(logger, "Planning frame_move: %s", move_group_interface.getPlanningFrame().c_str());
   
-  // Create collision object for the robot to avoid
-  auto const collision_object = [frame_id =
-                                  move_group_interface.getPlanningFrame()] {
-    moveit_msgs::msg::CollisionObject collision_object;
-    collision_object.header.frame_id = frame_id;
-    collision_object.id = "box1";
-    shape_msgs::msg::SolidPrimitive primitive;
 
-    // Define the size of the box in meters
-    primitive.type = primitive.BOX;
-    primitive.dimensions.resize(3);
-    primitive.dimensions[primitive.BOX_X] = 0.5;
-    primitive.dimensions[primitive.BOX_Y] = 0.1;
-    primitive.dimensions[primitive.BOX_Z] = 1;
+  // Add the stacker object
+  moveit_msgs::msg::CollisionObject collision_stacker;
+  collision_stacker.header.frame_id = move_group_interface.getPlanningFrame();
+  collision_stacker.id = "stacker";
 
-    // Define the pose of the box (relative to the frame_id)
-    geometry_msgs::msg::Pose box_pose;
-    box_pose.orientation.w = 1.0;
-    box_pose.position.x = 0.2;
-    box_pose.position.y = 0.85;
-    box_pose.position.z = 0.5;
+  const std::string stacker_mesh_path = "package://dsr_description2/meshes/container_corner/Depot_Stacker.dae";
+  shapes::Mesh* stacker_mesh = shapes::createMeshFromResource(stacker_mesh_path, Eigen::Vector3d(0.001, 0.001, 0.001));
 
-    collision_object.primitives.push_back(primitive);
-    collision_object.primitive_poses.push_back(box_pose);
-    collision_object.operation = collision_object.ADD;
-
-    return collision_object;
-  }();
-
-  // Add the collision object to the scene
-  moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
-  planning_scene_interface.applyCollisionObject(collision_object);
-
-  // Add a collision object from a .dae mesh file
-  moveit_msgs::msg::CollisionObject mesh_object;
-  mesh_object.header.frame_id = move_group_interface.getPlanningFrame();
-  mesh_object.id = "mesh1";
-
-  // Load mesh from file
-  const std::string mesh_path = "package://dsr_description2/meshes/container_corner/Depot_Stacker.dae"; // Update path as needed
-  shapes::Mesh* m = shapes::createMeshFromResource(mesh_path);
-  if (!m) {
-    RCLCPP_ERROR(logger, "Failed to load mesh from %s", mesh_path.c_str());
+  if (!stacker_mesh) {
+    RCLCPP_ERROR(logger, "Failed to load mesh from %s", stacker_mesh_path.c_str());
   } else {
-    shape_msgs::msg::Mesh mesh_msg;
-    shapes::ShapeMsg mesh_msg_tmp;
-    shapes::constructMsgFromShape(m, mesh_msg_tmp);
-    mesh_msg = boost::get<shape_msgs::msg::Mesh>(mesh_msg_tmp);
+    shape_msgs::msg::Mesh stacker_mesh_msg;
+    shapes::ShapeMsg tmp_msg;
+    shapes::constructMsgFromShape(stacker_mesh, tmp_msg);
+    stacker_mesh_msg = boost::get<shape_msgs::msg::Mesh>(tmp_msg);
 
-    mesh_object.meshes.push_back(mesh_msg);
+    collision_stacker.meshes.push_back(stacker_mesh_msg);
 
-    geometry_msgs::msg::Pose mesh_pose;
-    mesh_pose.orientation.w = 1.0;
-    mesh_pose.position.x = 0.5;
-    mesh_pose.position.y = 0.0;
-    mesh_pose.position.z = 0.5;
-    mesh_object.mesh_poses.push_back(mesh_pose);
+    geometry_msgs::msg::Pose stacker_pose;
+    stacker_pose.orientation.x = 0.5;
+    stacker_pose.orientation.y = 0.5;
+    stacker_pose.orientation.z = 0.5;
+    stacker_pose.orientation.w = 0.5;
+    stacker_pose.position.x = 0.35;
+    stacker_pose.position.y = 0.9;
+    stacker_pose.position.z = 0.48;
+    collision_stacker.mesh_poses.push_back(stacker_pose);
 
-    mesh_object.operation = mesh_object.ADD;
-    planning_scene_interface.applyCollisionObject(mesh_object);
+    collision_stacker.operation = collision_stacker.ADD;
 
-    delete m;
+    delete stacker_mesh;
   }
+
+  // Add first container corner
+  moveit_msgs::msg::CollisionObject collision_corner_1;
+  collision_corner_1.header.frame_id = move_group_interface.getPlanningFrame();
+  collision_corner_1.id = "corner1";
+
+  const std::string corner_mesh_path = "package://dsr_description2/meshes/container_corner/Containerecken_oben_rechts.dae";
+  shapes::Mesh* corner_mesh_1 = shapes::createMeshFromResource(corner_mesh_path, Eigen::Vector3d(0.001, 0.001, 0.001));
+
+  if (!corner_mesh_1) {
+    RCLCPP_ERROR(logger, "Failed to load mesh from %s", corner_mesh_path.c_str());
+  } else {
+    shape_msgs::msg::Mesh corner_mesh_msg_1;
+    shapes::ShapeMsg tmp_msg;
+    shapes::constructMsgFromShape(corner_mesh_1, tmp_msg);
+    corner_mesh_msg_1 = boost::get<shape_msgs::msg::Mesh>(tmp_msg);
+
+    collision_corner_1.meshes.push_back(corner_mesh_msg_1);
+
+    geometry_msgs::msg::Pose corner_pose_1;
+    corner_pose_1.orientation.w = 1.0;
+    corner_pose_1.position.x = 0.5;
+    corner_pose_1.position.y = 1.0;
+    corner_pose_1.position.z = 0.4;
+    collision_corner_1.mesh_poses.push_back(corner_pose_1);
+
+    collision_corner_1.operation = collision_corner_1.ADD;
+
+    delete corner_mesh_1;
+  }
+
+  // Add second container corner
+  moveit_msgs::msg::CollisionObject collision_corner_2;
+  collision_corner_2.header.frame_id = move_group_interface.getPlanningFrame();
+  collision_corner_2.id = "corner2";  
+
+  shapes::Mesh* corner_mesh_2 = shapes::createMeshFromResource(corner_mesh_path, Eigen::Vector3d(0.001, 0.001, 0.001));
+
+  if (!corner_mesh_2) {
+    RCLCPP_ERROR(logger, "Failed to load mesh from %s", corner_mesh_path.c_str());
+  } else {
+    shape_msgs::msg::Mesh corner_mesh_msg_2;
+    shapes::ShapeMsg tmp_msg;
+    shapes::constructMsgFromShape(corner_mesh_2, tmp_msg);
+    corner_mesh_msg_2 = boost::get<shape_msgs::msg::Mesh>(tmp_msg);
+
+    collision_corner_2.meshes.push_back(corner_mesh_msg_2);
+
+    geometry_msgs::msg::Pose corner_pose_2;
+    corner_pose_2.orientation.x = 0.0;
+    corner_pose_2.orientation.y = -1.0;
+    corner_pose_2.orientation.z = 0.0;
+    corner_pose_2.orientation.w = 0.0;
+    corner_pose_2.position.x = -0.10;
+    corner_pose_2.position.y = 0.20;
+    corner_pose_2.position.z = 0.80;
+    collision_corner_2.mesh_poses.push_back(corner_pose_2);
+
+    collision_corner_2.operation = collision_corner_2.ADD;
+
+    delete corner_mesh_2;
+  }
+
+  // Planning scene
+  moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
+  std::vector<moveit_msgs::msg::CollisionObject> objs = {collision_stacker, collision_corner_1, collision_corner_2};
+  planning_scene_interface.applyCollisionObjects(objs);
+  rclcpp::sleep_for(std::chrono::milliseconds(100));
+
 
   // Construct and initialize MoveItVisualTools
   auto moveit_visual_tools = moveit_visual_tools::MoveItVisualTools{
@@ -138,8 +177,8 @@ int main(int argc, char * argv[])
   
   auto const draw_trajectory_tool_path =
       [&moveit_visual_tools,
-      jmg = move_group_interface.getRobotModel()->getJointModelGroup("manipulator"),
-      ee_link = move_group_interface.getRobotModel()->getLinkModel("link_6")]
+      jmg = move_group_interface.getRobotModel()->getJointModelGroup("gripper"),
+      ee_link = move_group_interface.getRobotModel()->getLinkModel("left_finger")]
       (auto const& trajectory) {
         moveit_visual_tools.publishTrajectoryLine(trajectory, ee_link, jmg);
       };
@@ -152,9 +191,9 @@ int main(int argc, char * argv[])
     msg.orientation.y = -0.707058;
     msg.orientation.z = -8.56808e-06;
     msg.orientation.w = 7.56471e-06;
-    msg.position.x = 0.0252196;
-    msg.position.y = 1.218936;
-    msg.position.z = 0.491044;
+    msg.position.x = 0.34998;
+    msg.position.y = 0.89995;
+    msg.position.z = 0.67592;
     return msg;
   }();
   move_group_interface.setPoseTarget(target_pose);

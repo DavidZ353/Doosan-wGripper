@@ -54,6 +54,9 @@ def rviz_node_function(context):
         # namespace=LaunchConfiguration('name'),
         output="screen",
         parameters=[moveit_config.to_dict()],
+        remappings=[
+            ("/joint_states", "/merged_joint_states")
+        ],
     )
 
     # RViz
@@ -69,7 +72,11 @@ def rviz_node_function(context):
         name="hello_moveit",
         output="screen",
         parameters=[moveit_config.to_dict()],
+        remappings=[
+            ("/joint_states", "/merged_joint_states")
+        ],
     )
+
     
     return [run_move_group_node, hello_node,
         Node(
@@ -187,15 +194,22 @@ def generate_launch_description():
         name='robot_state_publisher',
         namespace=LaunchConfiguration('name'),
         output='both',
-        # remappings=[
-        #     (
-        #         "/joint_states",
-        #         "/dsr/joint_states",
-        #     ),
-        # ],
+        remappings=[
+            ("/joint_states","/merged_joint_states"),
+        ],
         parameters=[{
         'robot_description': Command(['xacro', ' ', xacro_path, '/', LaunchConfiguration('model'), '.urdf.xacro color:=', LaunchConfiguration('color')])           
     }])
+
+    # merge joint_states of robot and gripper for moveit configuration
+    merger_node = Node(
+        package="joint_state_merger",  
+        executable="merger_node",  
+        name="joint_state_merger",
+        output="screen",
+        parameters=[{"mode": LaunchConfiguration('mode')}],
+    )
+    
 
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
@@ -259,7 +273,7 @@ def generate_launch_description():
         )
     )
 
-    
+
     nodes = [
         set_config_node,
         run_emulator_node,
@@ -269,6 +283,7 @@ def generate_launch_description():
         joint_state_broadcaster_spawner,
         dsr_moveit_controller_spawner,
         delay_control_node_after_connection_node,
+        merger_node,
     ]
 
     return LaunchDescription(ARGUMENTS + nodes)

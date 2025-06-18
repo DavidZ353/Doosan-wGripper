@@ -16,7 +16,11 @@
   <depend>sensor_msgs</depend>
   <depend>std_srvs</depend>
   <depend>schunk_gripper_interfaces</depend>
-  <exec_depend>geometric_shapes</exec_depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>eigen</depend>
+  <depend>shape_msgs</depend>
+  <exec_depend>resource_retriever</exec_depend>
+
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

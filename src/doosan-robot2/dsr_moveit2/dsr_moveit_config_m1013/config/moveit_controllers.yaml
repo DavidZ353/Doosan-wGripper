@@ -22,5 +22,7 @@ moveit_simple_controller_manager:
       - joint_4
       - joint_5
       - joint_6
+      - left_finger_joint
+      - right_finger_joint
 
       
